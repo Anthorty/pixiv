@@ -400,7 +400,7 @@ class PixivApi:
         r = self._request_pixiv('GET', url, params=params)
         return self.parse_result(r)
 
-    def get_ranking_illustrations(self, mode='daily', date='', per_page=100, page=1):
+    def get_ranking_illustrations(self, mode='daily', date='', per_page=100, page=3):
         """
         fetch illustrations by ranking
 

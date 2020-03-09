@@ -5,9 +5,8 @@ pixiv
 Usage:
     pixiv.py
     pixiv.py <id>...
-    pixiv.py -r [-d | --date=<date>]
+    pixiv.py -r [-d | --date=<date>] [-m | --mode=<mode>]
     pixiv.py -u
-
 Arguments:
     <id>                                       user_ids
 
@@ -15,12 +14,13 @@ Options:
     -r                                         Download by ranking
     -d <date> --date <date>                    Target date
     -u                                         Update exist folder
+    -m <mode> --mode <mode>                    Change rank list
     -h --help                                  Show this screen
     -v --version                               Show version
 
 Examples:
     pixiv.py 7210261 1980643
-    pixiv.py -r -d 2016-09-24
+    pixiv.py -r -d 2018-01-01 -m monthly
 """
 import datetime
 import math
@@ -198,12 +198,11 @@ def check_files(illustrations, save_path='.', add_user_folder=False, add_rank=Fa
 def count_illustrations(illustrations):
     return sum(len(i.image_urls) for i in illustrations)
 
+def multi_pages(illustrate):
+    return True if illustrate.page_count != 1 else False
 
-def is_manga(illustrate):
-    return True if illustrate.is_manga or illustrate.type == 'manga' else False
 
-
-def download_illustrations(user, data_list, save_path='.', add_user_folder=False, add_rank=False, skip_manga=False):
+def download_illustrations(user, data_list, save_path='.', add_user_folder=False, add_rank=False, skip_multi=True):
     """Download illustratons
 
     Args:
@@ -214,11 +213,8 @@ def download_illustrations(user, data_list, save_path='.', add_user_folder=False
         add_rank: bool, add illustration rank at the beginning of filename
     """
     illustrations = PixivIllustModel.from_data(data_list, user)
-    if skip_manga:
-        manga_number = sum([is_manga(i) for i in illustrations])
-        if manga_number:
-            print('skip', manga_number, 'manga')
-            illustrations = list(filter(lambda x: not is_manga(x), illustrations))
+    if skip_multi:
+        illustrations = list(filter(lambda x: not multi_pages(x), illustrations))
     download_queue, count = check_files(illustrations, save_path, add_user_folder, add_rank)[0:2]
     if count > 0:
         print(_('Start download, total illustrations '), count)
@@ -241,21 +237,21 @@ def download_by_user_id(user, user_ids=None):
         download_illustrations(user, data_list, save_path, add_user_folder=True)
 
 
-def download_by_ranking(user):
+def download_by_ranking(user ,mode = 'daily'):
     today = str(datetime.date.today())
-    save_path = os.path.join(get_default_save_path(), today + ' ranking')
-    data_list = user.get_ranking_illustrations(per_page=100, mode='daily')
+    save_path = os.path.join(get_default_save_path(), today + ' ranking' + " " +mode[0])
+    data_list = user.get_ranking_illustrations(mode='daily')
     download_illustrations(user, data_list, save_path, add_rank=True)
 
 
-def download_by_history_ranking(user, date=''):
+def download_by_history_ranking(user, date='' ,mode = 'daily'):
     if not date:
         date = input(_('Input the date:(eg:2015-07-10)'))
     if not (re.search("^\d{4}-\d{2}-\d{2}", date)):
         print(_('[invalid]'))
         date = str(datetime.date.today())
-    save_path = os.path.join(get_default_save_path(), date + ' ranking')
-    data_list = user.get_ranking_illustrations(date=date, per_page=100, mode='daily')
+    save_path = os.path.join(get_default_save_path(), date + ' ranking' + " " + mode[0])
+    data_list = user.get_ranking_illustrations(date=date,mode='daily')
     download_illustrations(user, data_list, save_path, add_rank=True)
 
 
@@ -337,11 +333,16 @@ def main():
         is_rank = arguments['-r']
         date = arguments['--date']
         is_update = arguments['-u']
+        mode = arguments['--mode']
         if ids:
             download_by_user_id(user, ids)
         elif is_rank:
-            if date:
+            if date and mode:
                 date = date[0]
+                download_by_history_ranking(user, date, mode)
+            elif mode:
+                download_by_ranking(user, mode)
+            elif date:
                 download_by_history_ranking(user, date)
             else:
                 download_by_ranking(user)
